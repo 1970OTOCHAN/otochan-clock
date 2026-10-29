@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>1970otochan™clock</title>
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="おとーちゃんクロック">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<style>
+/* Layout: one full-screen instrument face. The time fills the screen; date sits below; controls fade in on tap. */
+:root{
+  --bg:#000000;
+  --digit:#ffffff;
+  --sub:#ffffff;
+  --muted:#ffffff;
+  --panel:#161616;
+  --line:#333333;
+  --ok:#5fd17a;
+  --warn:#ff7a4d;
+  --f-num:"Roboto Condensed","sans-serif-condensed","Arial Narrow",Roboto,"Helvetica Neue",system-ui,sans-serif;
+  --f-ui:system-ui,-apple-system,"Hiragino Sans","Noto Sans CJK JP","Noto Sans JP",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);height:100%}
+body{margin:0;height:100%}
+[hidden]{display:none!important}
+body{
+  background:var(--bg);color:var(--sub);font-family:var(--f-ui);
+  overflow:hidden;user-select:none;-webkit-user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.face{
+  height:100%;box-sizing:border-box;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:12px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vmin;
+}
+.time-wrap{flex:1 1 auto;width:100%;min-height:0;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vmin}
+.brand .yomi{display:block;margin-top:.45em;font:500 .62em/1 var(--f-ui);letter-spacing:.1em}
+.brand{flex:0 0 auto;font:600 clamp(14px,3.6vmin,24px)/1 var(--f-num);letter-spacing:.08em;color:var(--sub);text-align:center;padding-bottom:4px}
+.time{
+  font-family:var(--f-num);font-weight:700;color:var(--digit);
+  line-height:.82;white-space:nowrap;display:flex;align-items:baseline;font-variant-numeric:tabular-nums;
+  font-size:100px; /* overwritten by fit() */
+}
+.time .d{display:inline-block;text-align:center}
+.time .colon{display:inline-block;width:.3em;text-align:center;transform:translateY(-.06em)}
+.time .ampm{font-size:.22em;margin-left:.12em;font-weight:600;letter-spacing:.02em;color:var(--sub);align-self:flex-start;margin-top:.1em}
+.time .sec{font-size:.42em;margin-left:.12em;font-weight:600;color:var(--sub)}
+.info{
+  display:flex;gap:.3em;align-items:baseline;justify-content:center;flex-wrap:nowrap;white-space:nowrap;font-variant-numeric:tabular-nums;
+  font-family:var(--f-num);font-weight:600;color:var(--sub);
+  font-size:clamp(24px,min(10vmin,8.5vw),96px);line-height:1;
+}
+.info .wd{font-family:var(--f-ui);font-weight:700;font-size:.8em}
+
+/* controls */
+.bar{
+  position:fixed;left:0;right:0;bottom:0;
+  padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  display:flex;flex-wrap:wrap;gap:8px;justify-content:center;
+  background:color-mix(in srgb,var(--bg) 88%,transparent);
+  border-top:1px solid var(--line);
+  transition:opacity .25s,transform .25s;
+}
+.bar.hide{opacity:0;transform:translateY(100%);pointer-events:none}
+.bar button{
+  font:700 15px/1 var(--f-ui);color:var(--sub);background:var(--panel);
+  border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-height:46px;cursor:pointer;
+}
+.bar button[aria-pressed="true"]{color:var(--bg);background:var(--digit);border-color:var(--digit)}
+.bar button:focus-visible{outline:3px solid var(--digit);outline-offset:2px}
+.lock{
+  transition:opacity .4s;
+  position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:max(12px,env(safe-area-inset-right,0px));
+  font:500 12px/1 var(--f-ui);color:var(--muted);display:flex;gap:6px;align-items:center;
+}
+.lock i{width:8px;height:8px;border-radius:50%;background:var(--warn);display:inline-block}
+.lock.on i{background:var(--ok)}
+.hint{
+  position:fixed;top:calc(8px + env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));
+  font:500 12px/1 var(--f-ui);color:var(--muted);transition:opacity .4s;
+}
+.sync{
+  position:fixed;top:calc(28px + env(safe-area-inset-top,0px));right:max(12px,env(safe-area-inset-right,0px));
+  font:500 12px/1 var(--f-ui);color:var(--muted);transition:opacity .4s;
+}
+.hint.hide,.lock.hide,.sync.hide{opacity:0}
+@media (prefers-reduced-motion:reduce){.bar{transition:none}}
+</style>
+</head>
+<body>
+
+<main class="face" id="face">
+  <div class="time-wrap" id="wrap">
+    <div class="time" id="time" aria-live="off"></div>
+    <div class="info" id="info"><span id="date"></span><span class="wd" id="wd"></span></div>
+  </div>
+  <div class="brand">1970otochan™clock<span class="yomi">1970おとーちゃんクロック</span></div>
+</main>
+
+<div class="hint" id="hint">画面をタップで設定</div>
+<div class="lock" id="lock"><i></i><span id="lockText">画面ON維持：確認中</span></div>
+<div class="sync" id="sync">時刻補正：未実施</div>
+
+<nav class="bar" id="bar">
+  <button id="b24" type="button" aria-pressed="true">24時間</button>
+  <button id="bDate" type="button" aria-pressed="true">日付</button>
+  <button id="bSync" type="button">時刻合わせ</button>
+  <button id="bFull" type="button">全画面</button>
+</nav>
+
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const root=document.documentElement;
+  const WD=["日","月","火","水","木","金","土"];
+  let s={h24:true,sec:false,date:true};
+  try{const v=JSON.parse(localStorage.getItem("rideclock")||"null");if(v)s=Object.assign(s,v)}catch(e){}
+  s.sec=true;
+  const save=()=>{try{localStorage.setItem("rideclock",JSON.stringify(s))}catch(e){}};
+
+  function apply(){
+    $("b24").setAttribute("aria-pressed",s.h24);
+    $("b24").textContent=s.h24?"24時間":"12時間";
+    $("bDate").setAttribute("aria-pressed",s.date);
+    $("info").hidden=!s.date;
+    lastKey="";tick();
+  }
+
+  const pad=n=>String(n).padStart(2,"0");
+  let lastKey="";
+  function tick(){
+    const n=now();
+    let h=n.getHours(),ap="";
+    if(!s.h24){ap=h<12?"AM":"PM";h=h%12||12}
+    const hs=s.h24?pad(h):String(h).padStart(2," ");
+    const key=hs+n.getMinutes()+(s.sec?n.getSeconds():"")+ap;
+    if(key!==lastKey){
+      lastKey=key;
+      const digits=hs.split("").map(c=>`<span class="d">${c===" "?"":c}</span>`).join("")
+        +`<span class="colon">:</span>`
+        +pad(n.getMinutes()).split("").map(c=>`<span class="d">${c}</span>`).join("")
+        +(s.sec?`<span class="sec">${pad(n.getSeconds())}</span>`:"")
+        +(ap?`<span class="ampm">${ap}</span>`:"");
+      const t=$("time");const structure=t.dataset.k;const nk=(s.sec?"s":"")+(ap?"a":"")+s.date;
+      t.innerHTML=digits;
+      if(structure!==nk){t.dataset.k=nk;fit()}
+      $("date").textContent=`${n.getFullYear()}/${n.getMonth()+1}/${n.getDate()}`;
+      $("wd").textContent=`（${WD[n.getDay()]}）`;
+    }
+  }
+  function fit(){
+    const t=$("time"),w=$("wrap");
+    t.style.fontSize="100px";
+    const tw=t.scrollWidth,th=t.getBoundingClientRect().height;
+    const info=$("info");
+    const used=info.hidden?0:info.offsetHeight+parseFloat(getComputedStyle(w).rowGap||0);
+    const aw=w.clientWidth,ah=w.clientHeight-used;
+    if(!tw||!th||!aw||!ah)return;
+    const k=Math.min(aw*0.98/tw,ah*0.95/th);
+    t.style.fontSize=Math.floor(100*k)+"px";
+  }
+  function loop(){tick();const ms=((Date.now()+offset)%1000+1000)%1000;setTimeout(loop,1000-ms+5)}
+
+  /* time correction: once a day when online, read the server clock (Date header) */
+  const SYNC_KEY="rideclock-sync",DAY=24*60*60*1000;
+  let offset=0,syncedAt=0,syncing=false;
+  try{const v=JSON.parse(localStorage.getItem(SYNC_KEY)||"null");if(v&&isFinite(v.offset)&&isFinite(v.at)){offset=v.offset;syncedAt=v.at}}catch(e){}
+  function now(){return new Date(Date.now()+offset)}
+  function showSync(msg){
+    if(msg){$("sync").textContent=msg;return}
+    if(!syncedAt){$("sync").textContent="時刻補正：未実施";return}
+    const d=new Date(syncedAt+offset),sec=(offset/1000);
+    $("sync").textContent=`時刻補正：${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}（ずれ ${sec>=0?"+":""}${sec.toFixed(1)}秒）`;
+  }
+  async function sample(){
+    const t0=Date.now();
+    const r=await fetch(location.pathname+"?sync="+t0,{method:"HEAD",cache:"no-store"});
+    const t1=Date.now();
+    const d=Date.parse(r.headers.get("date")||"");
+    if(isNaN(d))throw new Error("no date");
+    return {lo:d-t1,hi:d+1000-t0};
+  }
+  async function syncTime(force){
+    if(syncing)return;
+    if(!force&&syncedAt&&Math.abs(Date.now()-syncedAt)<DAY)return;
+    if(navigator.onLine===false){if(force)showSync("時刻補正：電波なし");return}
+    syncing=true;if(force)showSync("時刻補正：確認中…");
+    try{
+      let lo=-Infinity,hi=Infinity,last=null;
+      for(let i=0;i<4;i++){
+        const s=await sample();last=s;
+        lo=Math.max(lo,s.lo);hi=Math.min(hi,s.hi);
+        if(i<3)await new Promise(r=>setTimeout(r,260+i*90));
+      }
+      offset=lo<=hi?Math.round((lo+hi)/2):Math.round((last.lo+last.hi)/2);
+      syncedAt=Date.now();
+      try{localStorage.setItem(SYNC_KEY,JSON.stringify({offset,at:syncedAt}))}catch(e){}
+      lastKey="";showSync();
+    }catch(e){
+      showSync(force?"時刻補正：失敗（電波を確認）":"");
+    }finally{syncing=false}
+  }
+  window.addEventListener("online",()=>syncTime(false));
+  setInterval(()=>syncTime(false),30*60*1000);
+
+  /* screen wake lock */
+  let lock=null;
+  async function keepOn(){
+    try{
+      if(!("wakeLock" in navigator))throw 0;
+      lock=await navigator.wakeLock.request("screen");
+      $("lock").classList.add("on");$("lockText").textContent="画面ON維持：有効";
+      lock.addEventListener("release",()=>{$("lock").classList.remove("on");$("lockText").textContent="画面ON維持：解除"});
+    }catch(e){
+      $("lock").classList.remove("on");
+      $("lockText").textContent="画面ON維持：無効（自動ロックをオフに）";
+    }
+  }
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){keepOn();syncTime(false)}});
+
+  /* controls auto-hide */
+  let hideT;
+  function showBar(){
+    ["bar","lock","sync"].forEach(id=>$(id).classList.remove("hide"));clearTimeout(hideT);
+    hideT=setTimeout(()=>["bar","lock","hint","sync"].forEach(id=>$(id).classList.add("hide")),3000);
+  }
+  $("face").addEventListener("click",()=>{showBar();keepOn()});
+  $("bar").addEventListener("click",e=>{e.stopPropagation();showBar()});
+
+  $("bSync").onclick=()=>syncTime(true);
+  $("b24").onclick=()=>{s.h24=!s.h24;save();apply()};
+  $("bDate").onclick=()=>{s.date=!s.date;save();apply();requestAnimationFrame(fit)};
+  $("bFull").onclick=async()=>{
+    try{
+      if(document.fullscreenElement)await document.exitFullscreen();
+      else await root.requestFullscreen();
+    }catch(e){$("bFull").textContent="全画面：非対応"}
+    keepOn();
+  };
+
+  window.addEventListener("resize",()=>requestAnimationFrame(fit));
+  if(screen.orientation)screen.orientation.addEventListener?.("change",()=>setTimeout(fit,200));
+  if(document.fonts)document.fonts.ready.then(fit);
+
+  const standalone=matchMedia("(display-mode: standalone)").matches||matchMedia("(display-mode: fullscreen)").matches||navigator.standalone;
+  if(standalone)$("bFull").hidden=true;
+  if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+  showSync();apply();fit();loop();keepOn();showBar();syncTime(false);
+})();
+</script>
+</body>
+</html>
