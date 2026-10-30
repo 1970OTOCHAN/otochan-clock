@@ -1,7 +1,11 @@
 # 1970otochan™clock（1970おとーちゃんクロック）
 
-バイクのスマホホルダー用の時計。GitHub Pages で公開中:
-https://1970otochan.github.io/otochan-clock/
+バイクのスマホホルダー用の時計。2か所で公開中:
+
+- GitHub Pages: https://1970otochan.github.io/otochan-clock/ （main に push すると自動で公開）
+- Netlify: https://1970otochan-clock.netlify.app/ （GitHub とはつないでいない。直接アップロードで公開）
+
+Netlify は自動では更新されない。変更したら、公開用の6ファイル（index.html, manifest.webmanifest, sw.js, icon-192.png, icon-512.png, apple-touch-icon.png）を「otochan-clock」フォルダに入れた zip をユーザーに渡し、Netlify のプロジェクト「1970otochan-clock」の Deploys 画面へドラッグしてもらう。
 
 ## 変更するときのルール（必ず守る）
 
