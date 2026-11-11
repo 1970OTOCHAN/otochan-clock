@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>日本100名城マップ</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  html, body { margin:0; height:100%; font-family: "Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif; }
+  #bar { position:absolute; top:0; left:0; right:0; z-index:1000; display:flex; align-items:center; gap:10px;
+         flex-wrap:wrap; padding:8px 12px; background:#3b2a1a; color:#fff; box-shadow:0 2px 6px rgba(0,0,0,.3); }
+  #bar h1 { font-size:18px; margin:0; font-weight:700; }
+  #count { background:#c0392b; padding:3px 10px; border-radius:12px; font-size:14px; font-weight:700; }
+  #bar select, #bar label { font-size:14px; }
+  #bar select { padding:3px; }
+  #map { position:absolute; top:48px; left:0; right:0; bottom:0; }
+  .castle { font-size:22px; line-height:30px; text-align:center; width:30px; height:30px; border-radius:50%;
+            background:#fff; border:2px solid #3b2a1a; box-shadow:0 1px 3px rgba(0,0,0,.4); }
+  .castle.visited { background:#ffd84d; border-color:#c0392b; }
+  .castle.visited::after { content:"✓"; position:absolute; right:-6px; top:-6px; background:#c0392b; color:#fff;
+            font-size:12px; line-height:16px; width:16px; height:16px; border-radius:50%; font-weight:700; }
+  .pop { width:260px; }
+  .pop h2 { margin:0 0 2px; font-size:17px; }
+  .pop .pref { color:#666; font-size:13px; margin-bottom:6px; }
+  .pop .photo { width:260px; min-height:60px; background:#eee; display:flex; align-items:center; justify-content:center;
+                color:#888; font-size:13px; border-radius:4px; overflow:hidden; }
+  .pop .photo img { width:100%; display:block; }
+  .pop .credit { font-size:11px; color:#777; margin-top:3px; line-height:1.4; }
+  .pop button { margin-top:8px; width:100%; padding:9px; font-size:15px; border:none; border-radius:6px;
+                cursor:pointer; background:#3b2a1a; color:#fff; font-weight:700; }
+  .pop button.on { background:#c0392b; }
+  .leaflet-popup-content { margin:10px; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <h1>🏯 日本100名城マップ</h1>
+  <span id="count">訪問 0 / 100</span>
+  <select id="jump"><option value="">城を選んで移動…</option></select>
+  <label><input type="checkbox" id="onlyNot"> 未訪問だけ表示</label>
+</div>
+<div id="map"></div>
+
+<script>
+// [番号, 城名, 都道府県, 緯度, 経度, Wikipedia記事名]
+const CASTLES = [
+[1,"根室半島チャシ跡群","北海道",43.370,145.680,"根室半島チャシ跡群"],
+[2,"五稜郭","北海道",41.7969,140.7570,"五稜郭"],
+[3,"松前城","北海道",41.4317,140.1086,"松前城"],
+[4,"弘前城","青森県",40.6080,140.4637,"弘前城"],
+[5,"根城","青森県",40.5050,141.4706,"根城"],
+[6,"盛岡城","岩手県",39.6996,141.1508,"盛岡城"],
+[7,"多賀城","宮城県",38.3070,140.9890,"多賀城"],
+[8,"仙台城","宮城県",38.2529,140.8561,"仙台城"],
+[9,"久保田城","秋田県",39.7225,140.1248,"久保田城"],
+[10,"山形城","山形県",38.2550,140.3270,"山形城"],
+[11,"二本松城","福島県",37.6020,140.4280,"二本松城"],
+[12,"会津若松城","福島県",37.4875,139.9298,"若松城"],
+[13,"白河小峰城","福島県",37.1325,140.2137,"白河小峰城"],
+[14,"水戸城","茨城県",36.3760,140.4770,"水戸城"],
+[15,"足利氏館","栃木県",36.3380,139.4520,"鑁阿寺"],
+[16,"箕輪城","群馬県",36.4100,138.9600,"箕輪城"],
+[17,"金山城","群馬県",36.3060,139.3810,"金山城 (上野国)"],
+[18,"鉢形城","埼玉県",36.1100,139.1950,"鉢形城"],
+[19,"川越城","埼玉県",35.9230,139.4930,"川越城"],
+[20,"佐倉城","千葉県",35.7225,140.2110,"佐倉城"],
+[21,"江戸城","東京都",35.6852,139.7528,"江戸城"],
+[22,"八王子城","東京都",35.6560,139.2580,"八王子城"],
+[23,"小田原城","神奈川県",35.2510,139.1540,"小田原城"],
+[24,"武田氏館","山梨県",35.6870,138.5770,"武田氏館"],
+[25,"甲府城","山梨県",35.6650,138.5700,"甲府城"],
+[26,"松代城","長野県",36.5650,138.1990,"松代城"],
+[27,"上田城","長野県",36.4030,138.2440,"上田城"],
+[28,"小諸城","長野県",36.3270,138.4200,"小諸城"],
+[29,"松本城","長野県",36.2386,137.9689,"松本城"],
+[30,"高遠城","長野県",35.8330,138.0620,"高遠城"],
+[31,"新発田城","新潟県",37.9550,139.3230,"新発田城"],
+[32,"春日山城","新潟県",37.1450,138.2050,"春日山城"],
+[33,"高岡城","富山県",36.7480,137.0270,"高岡城"],
+[34,"七尾城","石川県",37.0160,136.9930,"七尾城"],
+[35,"金沢城","石川県",36.5650,136.6590,"金沢城"],
+[36,"丸岡城","福井県",36.1520,136.2720,"丸岡城"],
+[37,"一乗谷城","福井県",35.9990,136.2980,"一乗谷朝倉氏遺跡"],
+[38,"岩村城","岐阜県",35.3610,137.4530,"岩村城"],
+[39,"岐阜城","岐阜県",35.4340,136.7820,"岐阜城"],
+[40,"山中城","静岡県",35.1620,139.0070,"山中城"],
+[41,"駿府城","静岡県",34.9780,138.3830,"駿府城"],
+[42,"掛川城","静岡県",34.7750,138.0140,"掛川城"],
+[43,"犬山城","愛知県",35.3880,136.9390,"犬山城"],
+[44,"名古屋城","愛知県",35.1856,136.8996,"名古屋城"],
+[45,"岡崎城","愛知県",34.9560,137.1590,"岡崎城"],
+[46,"長篠城","愛知県",34.9230,137.5600,"長篠城"],
+[47,"伊賀上野城","三重県",34.7720,136.1250,"伊賀上野城"],
+[48,"松阪城","三重県",34.5770,136.5250,"松阪城"],
+[49,"小谷城","滋賀県",35.4570,136.2790,"小谷城"],
+[50,"彦根城","滋賀県",35.2764,136.2518,"彦根城"],
+[51,"安土城","滋賀県",35.1560,136.1390,"安土城"],
+[52,"観音寺城","滋賀県",35.1440,136.1600,"観音寺城"],
+[53,"二条城","京都府",35.0142,135.7481,"二条城"],
+[54,"大阪城","大阪府",34.6873,135.5262,"大坂城"],
+[55,"千早城","大阪府",34.4160,135.6450,"千早城"],
+[56,"竹田城","兵庫県",35.3000,134.8290,"竹田城"],
+[57,"篠山城","兵庫県",35.0730,135.2180,"篠山城"],
+[58,"明石城","兵庫県",34.6520,134.9910,"明石城"],
+[59,"姫路城","兵庫県",34.8394,134.6939,"姫路城"],
+[60,"赤穂城","兵庫県",34.7450,134.3900,"赤穂城"],
+[61,"高取城","奈良県",34.4320,135.8220,"高取城"],
+[62,"和歌山城","和歌山県",34.2270,135.1720,"和歌山城"],
+[63,"鳥取城","鳥取県",35.5100,134.2390,"鳥取城"],
+[64,"松江城","島根県",35.4750,133.0510,"松江城"],
+[65,"月山富田城","島根県",35.3800,133.1900,"月山富田城"],
+[66,"津和野城","島根県",34.4580,131.7660,"津和野城"],
+[67,"津山城","岡山県",35.0620,134.0050,"津山城"],
+[68,"備中松山城","岡山県",34.8090,133.6220,"備中松山城"],
+[69,"鬼ノ城","岡山県",34.7240,133.7650,"鬼ノ城"],
+[70,"岡山城","岡山県",34.6650,133.9360,"岡山城"],
+[71,"福山城","広島県",34.4900,133.3620,"福山城 (備後国)"],
+[72,"郡山城","広島県",34.6660,132.7080,"吉田郡山城"],
+[73,"広島城","広島県",34.4027,132.4590,"広島城"],
+[74,"岩国城","山口県",34.1693,132.1735,"岩国城"],
+[75,"萩城","山口県",34.4200,131.3890,"萩城"],
+[76,"徳島城","徳島県",34.0750,134.5550,"徳島城"],
+[77,"高松城","香川県",34.3500,134.0520,"高松城 (讃岐国)"],
+[78,"丸亀城","香川県",34.2860,133.8000,"丸亀城"],
+[79,"今治城","愛媛県",34.0640,133.0060,"今治城"],
+[80,"湯築城","愛媛県",33.8480,132.7870,"湯築城"],
+[81,"松山城","愛媛県",33.8456,132.7655,"松山城 (伊予国)"],
+[82,"大洲城","愛媛県",33.5080,132.5430,"大洲城"],
+[83,"宇和島城","愛媛県",33.2190,132.5650,"宇和島城"],
+[84,"高知城","高知県",33.5607,133.5315,"高知城"],
+[85,"福岡城","福岡県",33.5850,130.3830,"福岡城"],
+[86,"大野城","福岡県",33.5450,130.4950,"大野城 (筑前国)"],
+[87,"名護屋城","佐賀県",33.5290,129.8690,"名護屋城"],
+[88,"吉野ヶ里","佐賀県",33.3270,130.3850,"吉野ヶ里遺跡"],
+[89,"佐賀城","佐賀県",33.2470,130.3040,"佐賀城"],
+[90,"平戸城","長崎県",33.3700,129.5600,"平戸城"],
+[91,"島原城","長崎県",32.7890,130.3680,"島原城"],
+[92,"熊本城","熊本県",32.8063,130.7058,"熊本城"],
+[93,"人吉城","熊本県",32.2140,130.7620,"人吉城"],
+[94,"大分府内城","大分県",33.2400,131.6100,"府内城"],
+[95,"岡城","大分県",32.9690,131.4100,"岡城"],
+[96,"飫肥城","宮崎県",31.6290,131.3510,"飫肥城"],
+[97,"鹿児島城","鹿児島県",31.5970,130.5550,"鹿児島城"],
+[98,"今帰仁城","沖縄県",26.6910,127.9290,"今帰仁城"],
+[99,"中城城","沖縄県",26.2830,127.8010,"中城城"],
+[100,"首里城","沖縄県",26.2170,127.7190,"首里城"]
+];
+
+// ---- 訪問記録（このブラウザに保存） ----
+const KEY = "meijo100_visited";
+let visited = new Set();
+try { visited = new Set(JSON.parse(localStorage.getItem(KEY) || "[]")); } catch(e) {}
+function saveVisited(){ try { localStorage.setItem(KEY, JSON.stringify([...visited])); } catch(e) {} }
+function updateCount(){ document.getElementById("count").textContent = `訪問 ${visited.size} / 100`; }
+
+// ---- 地図（国土地理院タイル） ----
+const gsiAttr = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank">地理院タイル</a>';
+const layers = {
+  "標準地図": L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png", {attribution:gsiAttr, maxZoom:18}),
+  "淡色地図": L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png", {attribution:gsiAttr, maxZoom:18}),
+  "写真":     L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg", {attribution:gsiAttr, maxZoom:18})
+};
+const map = L.map("map", { layers:[layers["標準地図"]] }).setView([36.5, 136.0], 5);
+L.control.layers(layers, null, {collapsed:false}).addTo(map);
+
+function makeIcon(no){
+  return L.divIcon({ className:"", iconSize:[30,30], iconAnchor:[15,15], popupAnchor:[0,-14],
+    html:`<div class="castle${visited.has(no) ? " visited" : ""}" style="position:relative">🏯</div>` });
+}
+
+// ---- 写真（Wikipedia / ウィキメディア・コモンズ） ----
+const photoCache = {};
+function stripHtml(h){ const d = document.createElement("div"); d.innerHTML = h || ""; return d.textContent.trim(); }
+async function getPhoto(title){
+  if (photoCache[title]) return photoCache[title];
+  const api = "https://ja.wikipedia.org/w/api.php?format=json&origin=*&action=query";
+  const r1 = await fetch(`${api}&redirects=1&prop=pageimages&piprop=thumbnail|name&pithumbsize=640&titles=${encodeURIComponent(title)}`).then(r=>r.json());
+  const page = Object.values(r1.query.pages)[0];
+  const info = { pageUrl:`https://ja.wikipedia.org/wiki/${encodeURIComponent(page.title || title)}` };
+  if (page.thumbnail) {
+    info.src = page.thumbnail.source;
+    try {
+      const r2 = await fetch(`${api}&prop=imageinfo&iiprop=extmetadata|url&titles=${encodeURIComponent("File:" + page.pageimage)}`).then(r=>r.json());
+      const ii = Object.values(r2.query.pages)[0].imageinfo[0];
+      info.fileUrl = ii.descriptionurl;
+      info.artist = stripHtml(ii.extmetadata.Artist && ii.extmetadata.Artist.value);
+      info.license = stripHtml(ii.extmetadata.LicenseShortName && ii.extmetadata.LicenseShortName.value);
+    } catch(e) {}
+  }
+  photoCache[title] = info;
+  return info;
+}
+
+// ---- マーカー ----
+const markers = {};
+const jump = document.getElementById("jump");
+CASTLES.forEach(([no, name, pref, lat, lng, wiki]) => {
+  const m = L.marker([lat, lng], { icon: makeIcon(no), title: `${no} ${name}` });
+
+  const box = document.createElement("div");
+  box.className = "pop";
+  box.innerHTML = `<h2>${no}. ${name}</h2><div class="pref">${pref}</div>
+    <div class="photo">写真を読み込み中…</div><div class="credit"></div><button></button>`;
+  const btn = box.querySelector("button");
+  function paintBtn(){
+    const v = visited.has(no);
+    btn.textContent = v ? "✓ 行った！（タップで取り消し）" : "行ったところに印を付ける";
+    btn.className = v ? "on" : "";
+  }
+  btn.onclick = () => {
+    visited.has(no) ? visited.delete(no) : visited.add(no);
+    saveVisited(); updateCount(); paintBtn(); m.setIcon(makeIcon(no)); applyFilter();
+  };
+  paintBtn();
+  m.bindPopup(box, { maxWidth: 280 });
+
+  let loaded = false;
+  m.on("popupopen", async () => {
+    if (loaded) return; loaded = true;
+    const photo = box.querySelector(".photo"), credit = box.querySelector(".credit");
+    try {
+      const p = await getPhoto(wiki);
+      if (p.src) {
+        const img = new Image();
+        img.onload = () => m.getPopup().update();
+        img.src = p.src; img.alt = name;
+        photo.innerHTML = ""; photo.appendChild(img);
+        const who = [p.artist, p.license].filter(Boolean).join(" / ");
+        credit.innerHTML = `写真：<a href="${p.fileUrl || p.pageUrl}" target="_blank">ウィキメディア・コモンズ</a>${who ? "（" + who.replace(/</g,"&lt;") + "）" : ""}
+          ・<a href="${p.pageUrl}" target="_blank">Wikipediaで詳しく</a>`;
+      } else {
+        photo.textContent = "写真が見つかりませんでした";
+        credit.innerHTML = `<a href="${p.pageUrl}" target="_blank">Wikipediaで見る</a>`;
+      }
+    } catch(e) {
+      photo.textContent = "写真を読み込めませんでした（インターネット接続を確認してください）";
+    }
+    m.getPopup().update();
+  });
+
+  m.addTo(map);
+  markers[no] = m;
+  const opt = document.createElement("option");
+  opt.value = no; opt.textContent = `${no}. ${name}（${pref}）`;
+  jump.appendChild(opt);
+});
+
+jump.onchange = () => {
+  const no = Number(jump.value); if (!no) return;
+  const m = markers[no];
+  if (!map.hasLayer(m)) m.addTo(map);
+  map.setView(m.getLatLng(), 14); m.openPopup();
+};
+
+const onlyNot = document.getElementById("onlyNot");
+function applyFilter(){
+  CASTLES.forEach(([no]) => {
+    const m = markers[no], hide = onlyNot.checked && visited.has(no);
+    if (hide && map.hasLayer(m) && !m.isPopupOpen()) map.removeLayer(m);
+    if (!hide && !map.hasLayer(m)) m.addTo(map);
+  });
+}
+onlyNot.onchange = applyFilter;
+updateCount();
+</script>
+</body>
+</html>
