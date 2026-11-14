@@ -104,7 +104,7 @@ body{
     <div class="time" id="time" aria-live="off"></div>
     <div class="info" id="info"><span id="date"></span><span class="wd" id="wd"></span></div>
   </div>
-  <div class="brand">1970otochan™clock<span class="yomi">1970おとーちゃんクロック　Ver.1.0</span></div>
+  <div class="brand">1970otochan™clock<span class="yomi">1970おとーちゃんクロック　Ver.1.1</span></div>
 </main>
 
 <div class="hint" id="hint">画面をタップで設定</div>
@@ -254,7 +254,12 @@ body{
 
   const standalone=matchMedia("(display-mode: standalone)").matches||matchMedia("(display-mode: fullscreen)").matches||navigator.standalone;
   if(standalone)$("bFull").hidden=true;
-  if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+  // 開くたびに最新版を確認し、新しい sw.js に切り替わったら1回だけ自動で読み込み直す
+  if("serviceWorker" in navigator){
+    const hadCtl=!!navigator.serviceWorker.controller;let reloaded=false;
+    navigator.serviceWorker.addEventListener("controllerchange",()=>{if(hadCtl&&!reloaded){reloaded=true;location.reload()}});
+    navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>{r.update().catch(()=>{});document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")r.update().catch(()=>{})})}).catch(()=>{});
+  }
   showSync();apply();fit();loop();keepOn();showBar();syncTime(false);
 })();
 </script>
