@@ -95,6 +95,16 @@ body{
 }
 .hint.hide,.lock.hide,.sync.hide{opacity:0}
 @media (prefers-reduced-motion:reduce){.bar{transition:none}}
+/* オープニング：開いたときに名前と免責の文を約4秒表示（タップで飛ばせる） */
+.op{position:fixed;inset:0;z-index:50;background:#000;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:14px;padding:max(20px,env(safe-area-inset-top)) 22px max(20px,env(safe-area-inset-bottom));overflow-y:auto;font-family:var(--f-ui);transition:opacity .4s}
+.op.out{opacity:0;pointer-events:none}
+.op h1{margin:0;font:600 clamp(26px,7vmin,44px)/1.1 var(--f-num);letter-spacing:.06em;text-align:center}
+.op .y{font:500 clamp(13px,3.4vmin,18px)/1.3 var(--f-ui);letter-spacing:.1em;text-align:center;opacity:.85}
+.op .legal{max-width:36em;font-size:13px;line-height:1.6;color:#bbb;border-top:1px solid #333;padding-top:12px}
+.op .legal p{margin:0 0 6px}
+.op .cr{text-align:center;color:#ddd}
+.op .tap{font-size:12px;color:#888}
+@media (prefers-reduced-motion:reduce){.op{transition:none}}
 </style>
 </head>
 <body>
@@ -104,7 +114,7 @@ body{
     <div class="time" id="time" aria-live="off"></div>
     <div class="info" id="info"><span id="date"></span><span class="wd" id="wd"></span></div>
   </div>
-  <div class="brand">1970otochan™clock<span class="yomi">1970おとーちゃんクロック　Ver.1.1</span></div>
+  <div class="brand">1970otochan™clock<span class="yomi">1970おとーちゃんクロック　Ver.1.2</span></div>
 </main>
 
 <div class="hint" id="hint">画面をタップで設定</div>
@@ -263,5 +273,18 @@ body{
   showSync();apply();fit();loop();keepOn();showBar();syncTime(false);
 })();
 </script>
+<div class="op" id="op" role="dialog" aria-label="ご利用について">
+  <h1>1970otochan™clock</h1>
+  <div class="y">1970おとーちゃんクロック</div>
+  <div class="legal">
+    <p>本アプリは無料で提供しており、表示の正確さ・動作を保証するものではありません。</p>
+    <p>本アプリの使用または使用できなかったことにより生じた事故・損害・トラブル等について、作者は一切の責任を負いません。</p>
+    <p>走行中は本アプリの操作・注視をせず、交通ルールを守って安全運転でご利用ください。</p>
+    <p>アプリそのものの無断での再配布・改変・販売はご遠慮ください。スクリーンショットやリンクでの紹介は自由です。</p>
+    <p class="cr">© 2026 1970 OTOCHAN</p>
+  </div>
+  <div class="tap">タップで時計へ</div>
+</div>
+<script>{const o=document.getElementById("op");let t=0;const close=e=>{if(e)e.stopPropagation();clearTimeout(t);o.classList.add("out");setTimeout(()=>o.remove(),450)};o.addEventListener("click",close);t=setTimeout(close,4000);}</script>
 </body>
 </html>
